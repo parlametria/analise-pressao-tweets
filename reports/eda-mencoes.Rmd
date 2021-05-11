@@ -1,0 +1,124 @@
+---
+title: "EDA dos tweets sobre proposições"
+output:
+    html_document:
+    df_print: paged
+theme: sandstone
+---
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(here)
+library(lubridate)
+library(hrbrthemes)
+theme_set(theme_ipsum_rc())
+
+knitr::opts_chunk$set(tidy = FALSE,
+                      fig.width = 6,
+                      fig.height = 5,
+                      echo = FALSE)
+```
+
+```{r read}
+dados = read_csv(here("data/raw/tweets_parlamentares_e_influenciadores_v2.csv"))
+```
+
+```{r}
+dados = dados %>% 
+    separate(citadas, sep = "/", into = c("citada", "citada_ano")) %>% 
+    filter(str_length(citada) > 3) %>% 
+    mutate(semana = floor_date(created_at, unit = "weeks"))
+
+glimpse(dados)
+```
+
+```{r}
+dados %>% 
+    group_by(group) %>% 
+    summarise(perfis = n_distinct(username), 
+              .groups = "drop")
+
+dados %>% 
+    count(group)
+```
+
+
+```{r}
+dados %>% 
+    count(citada, sort = T)  
+```
+
+```{r}
+dados %>% 
+    count(semana, group) %>% 
+    filter(year(semana) >= 2019) %>% 
+    ggplot(aes(x = semana, y = n, fill = group)) + 
+    facet_grid(group ~ .) + 
+    geom_area(show.legend = F)
+```
+
+
+```{r}
+por_semana = dados %>% 
+    count(semana, group) %>% 
+    filter(year(semana) >= 2019) 
+
+por_semana %>% 
+    ggplot(aes(x = semana, y = n, color = group)) + 
+    geom_line()
+
+por_semana %>% 
+    pivot_wider(names_from = group, values_from = n) %>% 
+    ggplot(aes(x = influenciadores, y = parlamentares)) + 
+    geom_point() + 
+    geom_smooth(method = "lm", se = F)
+```
+
+```{r}
+exemplos = c("pl510", "mp910", "pl1075", "pl1142", "pl2633")
+
+dados %>% 
+    filter(citada %in% exemplos) %>% 
+    count(semana, group, citada) %>% 
+    complete(semana, group, citada, fill = list(n = 0)) %>% 
+    filter(year(semana) >= 2019) %>% 
+    ggplot(aes(x = semana, y = n + 1, color = group)) + 
+    facet_grid(citada ~ .) + 
+    geom_line() + 
+    scale_fill_brewer(palette = "Set2") 
+
+dados %>% 
+    filter(citada %in% exemplos) %>% 
+    count(semana, group, citada) %>% 
+    complete(semana, group, citada, fill = list(n = 0)) %>% 
+    filter(year(semana) >= 2019) %>% 
+    ggplot(aes(x = semana, y = n + 1, color = group)) + 
+    facet_grid(citada ~ .) + 
+    geom_line() + 
+    scale_color_brewer(palette = "Set2") + 
+    scale_y_log10()
+```
+
+
+
+```{r}
+tema_semana = dados %>% 
+    count(semana, group, citada) %>% 
+    filter(year(semana) >= 2019) %>% 
+    group_by(semana, group) %>% 
+    filter(n == max(n)) %>% 
+    ungroup()
+
+tema_semana %>% 
+    count(citada, sort = T)
+
+tema_semana %>% 
+    pivot_wider(names_from = group, values_from = n, values_fill = 0) %>% 
+    mutate(diferenca = influenciadores - parlamentares) 
+```
+
+```{r}
+
+```
+
+
