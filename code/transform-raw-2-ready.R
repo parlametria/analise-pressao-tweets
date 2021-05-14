@@ -92,6 +92,9 @@ mapeia_citadas_para_id <- function(
 #' ponderada onde score = 0.5 * usuarios + 0.5 * log2(engajamento).
 .calcula_pressao <- function(df) {
   df %>%
+    complete(date, sigla, fill = list(interactions = 0)) %>%
+    mutate_at(vars(user_count:sum_interactions),
+              list( ~ ifelse(is.na(.), 0, .))) %>% 
     mutate(log_interactions = if_else(sum_interactions > 0,
                                       log2(sum_interactions),
                                       0)) %>%
@@ -103,10 +106,10 @@ mapeia_citadas_para_id <- function(
     mutate(
       metricas_normalizadas = 0.5 * norm_user_count + 0.5 * norm_sum_interactions,
       metricas_norm_log_interactions = 0.5 * norm_user_count + 0.5 * norm_log_sum_interactions
-    ) %>%
-    complete(date, sigla, fill = list(interactions = 0)) %>%
-    mutate_at(vars(user_count:metricas_norm_log_interactions),
-              list( ~ ifelse(is.na(.), 0, .)))
+    )
+  # %>% 
+  # group_by(date) %>% 
+  # mutate(max_pressao_movel = zoo::rollmean(max_pressao, k = 3, fill = 0))
 }
 
 calcula_pressao_tweets <- function(tweets_proposicoes) {
