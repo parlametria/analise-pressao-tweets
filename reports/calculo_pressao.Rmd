@@ -1,0 +1,148 @@
+---
+title: "Pressão do Twitter"
+output: html_document
+---
+
+Este relatório tem como objetivo comparar duas métricas para a pressão do Twitter no Painel Parlamentria. Os dados utilizados são tweets sobre proposições monitoradas pelo Painel no período de 31/12/2018 a 26/04/2021.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+```
+
+```{r results='hide'}
+library(ggplot2)
+library(tidyverse)
+library(DT)
+library(scales)
+
+dados <-
+  read_csv(here::here("data/ready/pressao.csv")) 
+
+## Proposições que tiveram pressão por mais tempo
+siglas <- dados %>% 
+  filter(user_count > 0) %>% 
+  count(sigla) %>% 
+  arrange(desc(n)) %>% 
+  head(20)
+
+dados <- dados %>% 
+  filter(sigla %in%(siglas$sigla))
+```
+
+```{r }
+generate_pressao <- function(df) {
+  df <- df %>%
+    pivot_longer(
+      cols = c(metricas_normalizadas, metricas_norm_log_interactions),
+      names_to = "tipo_score",
+      values_to = "value"
+    )
+  
+  COLORS <- c(metricas_normalizadas = "darkred",
+              metricas_norm_log_interactions = "steelblue")
+  
+  ggplot(df, aes(
+    x = date,
+    y = value,
+    group = tipo_score,
+    color = tipo_score
+  )) +
+    geom_line() +
+    theme_minimal() +
+    ylab("pressão") +
+    xlab("data") +
+    scale_color_manual(values = COLORS) +
+    scale_x_date(date_labels = "%b/%Y")
+} 
+```
+
+## Cálculo da pressão
+
+Os scores do experimento consideram os dados de número de diferentes usuários e o número total de engajamento dos tweets sobre uma proposição em uma semana. Fizemos duas formas de calcular a pressão:
+
+- A primeira normaliza tanto o número de usuários quanto o de engajamento, dividindo cada coluna pelo maior valor geral, deixando-as numa escala entre 0 e 1.
+Depois disso é feita uma média ponderada onde 
+
+  **`score = 0.5 * usuarios + 0.5 * engajamento`**;
+
+- A segunda considera o log10 do engajamento no cálculo, além da normalização tanto do número de usuários quanto o valor do log de engajamento, dividindo cada coluna pelo maior valor geral, deixando-as numa escala entre 0 e 1.
+Depois disso é feita uma média ponderada onde 
+
+  **`score = 0.5 * usuarios + 0.5 * log10(engajamento)`**;
+  
+```{r}
+prop_mais_tweetada <- siglas %>% 
+  head(1)
+```
+
+## `r prop_mais_tweetada$sigla`
+
+Esta proposição foi tweetada por parlamentares e/ou influenciadores por `r prop_mais_tweetada$n` semanas. Abaixo podemos ver sua pressão calculada considerando os dois scores explicados anteriormente.
+
+```{r }
+dados %>%
+  filter(sigla == prop_mais_tweetada$sigla) %>%
+  generate_pressao()
+```
+
+```{r}
+prop_com_maior_engajamento <- dados %>% 
+  arrange(desc(sum_interactions)) %>% 
+  head(1)
+```
+
+## `r prop_com_maior_engajamento$sigla`
+
+Esta proposição possui o maior engajamento (replies + likes + retweets). 
+Na semana do dia `r format(as.Date(prop_com_maior_engajamento$date), "%d/%m/%Y")`, `r prop_com_maior_engajamento$user_count` usuários diferentes tweetaram sobre este projeto de lei e juntos tiveram cerca de 
+`r label_number_si(accuracy=0.1)(prop_com_maior_engajamento$sum_interactions)` engajamentos.
+
+```{r }
+dados %>%
+  filter(sigla == prop_com_maior_engajamento$sigla) %>% 
+  generate_pressao()
+```
+
+```{r}
+prop_mais_usuarios <- dados %>%
+  arrange(desc(user_count)) %>% 
+  head(1)
+```
+
+## `r prop_mais_usuarios$sigla`
+
+Esta proposição possui o maior número de usuários diferentes tweetando sobre em uma semana. Na semana de `r format(as.Date(prop_com_maior_engajamento$date), "%d/%m/%Y")`, `r prop_com_maior_engajamento$user_count` usuários (entre parlamentares e influenciadores) tweetaram sobre esta proposição.
+
+```{r}
+dados %>%
+  filter(sigla == prop_mais_usuarios$sigla) %>% 
+  generate_pressao()
+```
+
+## Proposições que possuem pressão por mais tempo
+
+```{r}
+dados %>% 
+  filter(sigla %in%(siglas %>% head(6) %>% pull(sigla))) %>% 
+  generate_pressao() + 
+  facet_wrap(~sigla) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+As proposições falam dos seguintes assuntos:
+
+- MPV 870/2019: Reorganização dos órgãos da presidência, dos ministérios e suas atribuições;
+- MPV 910/2019: Regularização fundiária e grilagem;
+- MPV 936/2020: Programa Emergencial de Manutenção do Emprego e Renda;
+- PEC 45/2019: Reforma Tributária;
+- PEC 6/2019: Reforma da Previdência;
+- PL 2630/2020: PL das Fake News.
+
+
+## Tabela com os dados
+
+```{r}
+datatable(dados)
+```
+
