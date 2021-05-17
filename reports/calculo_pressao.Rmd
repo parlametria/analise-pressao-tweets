@@ -6,15 +6,22 @@ output: html_document
 Este relatório tem como objetivo comparar duas métricas para a pressão do Twitter no Painel Parlamentria. Os dados utilizados são tweets sobre proposições monitoradas pelo Painel no período de 31/12/2018 a 26/04/2021.
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE)
-```
-
-```{r results='hide'}
 library(ggplot2)
 library(tidyverse)
 library(DT)
+library(hrbrthemes)
 library(scales)
 
+theme_set(theme_ipsum_rc())
+
+knitr::opts_chunk$set(tidy = FALSE,
+                      fig.width = 8,
+                      fig.height = 5,
+                      echo = FALSE,
+                      message = FALSE)
+```
+
+```{r results='hide'}
 dados <-
   read_csv(here::here("data/ready/pressao.csv")) 
 
@@ -33,22 +40,21 @@ dados <- dados %>%
 generate_pressao <- function(df) {
   df <- df %>%
     pivot_longer(
-      cols = c(metricas_normalizadas, metricas_norm_log_interactions),
-      names_to = "tipo_score",
+      cols = c(pressao, pressao_movel),
+      names_to = "tipo_metrica",
       values_to = "value"
     )
   
-  COLORS <- c(metricas_normalizadas = "darkred",
-              metricas_norm_log_interactions = "steelblue")
+  COLORS <- c(pressao = "#91bfdb",
+              pressao_movel = "#f1a340")
   
   ggplot(df, aes(
     x = date,
     y = value,
-    group = tipo_score,
-    color = tipo_score
+    group = tipo_metrica,
+    color = tipo_metrica
   )) +
     geom_line() +
-    theme_minimal() +
     ylab("pressão") +
     xlab("data") +
     scale_color_manual(values = COLORS) +
@@ -58,17 +64,12 @@ generate_pressao <- function(df) {
 
 ## Cálculo da pressão
 
-Os scores do experimento consideram os dados de número de diferentes usuários e o número total de engajamento dos tweets sobre uma proposição em uma semana. Fizemos duas formas de calcular a pressão:
+A pressão foi calcula da seguinte forma:
 
-- A primeira normaliza tanto o número de usuários quanto o de engajamento, dividindo cada coluna pelo maior valor geral, deixando-as numa escala entre 0 e 1.
-Depois disso é feita uma média ponderada onde 
-
-  **`score = 0.5 * usuarios + 0.5 * engajamento`**;
-
-- A segunda considera o log10 do engajamento no cálculo, além da normalização tanto do número de usuários quanto o valor do log de engajamento, dividindo cada coluna pelo maior valor geral, deixando-as numa escala entre 0 e 1.
-Depois disso é feita uma média ponderada onde 
-
-  **`score = 0.5 * usuarios + 0.5 * log10(engajamento)`**;
+1. Adicionando escala logarítmica ao engajamento;
+2. Normalizando o número de usuários diferentes e o engajamento se baseando no maior valor obtido durante a semana (considerando todas as proposições);
+3. Calculando a pressão utilizando a fórmula **`pressao = 0.5 * num_usuarios + 0.5 * log2(engajamento)`**.
+4. Também utilizamos como métrica a **média móvel da pressão** nas últimas 3 semanas.
   
 ```{r}
 prop_mais_tweetada <- siglas %>% 
@@ -137,12 +138,21 @@ As proposições falam dos seguintes assuntos:
 - MPV 936/2020: Programa Emergencial de Manutenção do Emprego e Renda;
 - PEC 45/2019: Reforma Tributária;
 - PEC 6/2019: Reforma da Previdência;
-- PL 2630/2020: PL das Fake News.
+- PL 3267/2019: Código de Trânsito.
 
 
 ## Tabela com os dados
 
 ```{r}
-datatable(dados)
+datatable(
+  dados %>% select(
+    data = date,
+    sigla,
+    norm_user_count,
+    norm_log_sum_interactions,
+    pressao,
+    pressao_movel
+  )
+)
 ```
 
